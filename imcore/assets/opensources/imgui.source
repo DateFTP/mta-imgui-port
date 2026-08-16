@@ -1,0 +1,1285 @@
+----------------------------------------------------------------------------
+local ImGui = {}
+_G.ImGui = ImGui
+local imgui = ImGui
+
+local uiW, uiH = 1920, 1080
+local realW, realH = guiGetScreenSize()
+
+local function px(x) if type(x) ~= 'number' then x = 0 end return math.floor(x * realW / uiW) end
+local function py(y) if type(y) ~= 'number' then y = 0 end return math.floor(y * realH / uiH) end
+local function pxn(x) if type(x) ~= 'number' then x = 0 end return x * realW / uiW end
+local function pyn(y) if type(y) ~= 'number' then y = 0 end return y * realH / uiH end
+local function clamp(v, lo, hi)
+    if v < lo then return lo end
+    if v > hi then return hi end
+    return v
+end
+local function max(a, b) return a > b and a or b end
+local function min(a, b) return a < b and a or b end
+local function toColor(r, g, b, a) return tocolor(r or 255, g or 255, b or 255, a or 255) end
+
+function isMouseInPosition(x, y, width, height)
+    if not isCursorShowing() then return false end
+    local sx, sy = guiGetScreenSize()
+    local cx, cy = getCursorPosition()
+    cx, cy = cx * sx, cy * sy
+    return (cx >= x and cx <= x + width) and (cy >= y and cy <= y + height)
+end
+
+---------------------------------------------------------------------------- mouse input
+local clickTick = 0
+local upTick = 0
+local wheelDelta = 0
+local wheelTick = 0
+local mouseX, mouseY = -9999, -9999
+local wheel = 0
+local mouseDown = false
+local mouseClicked = false
+local mouseReleased = false
+
+function isMouseButtonPressed(button)
+    return getKeyState(button == 'left' and 'mouse1' or button)
+end
+
+addEventHandler('onClientClick', root, function(button, state)
+    if button ~= 'left' then return end
+    if state == 'down' then clickTick = getTickCount() end
+    if state == 'up' then upTick = getTickCount() end
+end)
+
+addEventHandler('onClientKey', root, function(key, state)
+    if not state then return end
+    if key == 'mouse_wheel_up' then
+        wheelDelta = wheelDelta + 1
+        wheelTick = getTickCount()
+    elseif key == 'mouse_wheel_down' then
+        wheelDelta = wheelDelta - 1
+        wheelTick = getTickCount()
+    end
+end)
+
+function ImGui.GetMousePos()
+    return mouseX, mouseY
+end
+function ImGui.IsMouseClicked()
+    return mouseClicked
+end
+function ImGui.IsMouseReleased()
+    return mouseReleased
+end
+
+local function updateMouse()
+    if isCursorShowing() then
+        local cx, cy = getCursorPosition()
+        mouseX, mouseY = cx * uiW, cy * uiH
+    else
+        mouseX, mouseY = -9999, -9999
+    end
+
+    local now = getTickCount()
+    local down = isMouseButtonPressed('left')
+
+    if now - wheelTick > 40 then wheelDelta = 0 end
+    wheel = wheelDelta
+
+    mouseClicked = down and (now - clickTick) <= 35
+    mouseReleased = not down and (now - upTick) <= 35
+    mouseDown = down
+end
+
+---------------------------------------------------------------------------- keyboard queue
+local charQueue = {}
+local keyQueue = {}
+
+addEventHandler('onClientCharacter', root, function(char)
+    if #charQueue < 64 then table.insert(charQueue, char) end
+end)
+
+addEventHandler('onClientKey', root, function(key, state)
+    if state then
+        if key ~= 'mouse_wheel_up' and key ~= 'mouse_wheel_down'
+            and key ~= 'mouse_left' and key ~= 'mouse_right' and key ~= 'mouse_middle' then
+            if #keyQueue < 32 then table.insert(keyQueue, key) end
+        end
+    end
+end)
+
+---------------------------------------------------------------------------- style
+local function col(r, g, b, a)
+    return { r, g, b, a or 255 }
+end
+
+local style = {
+    WindowPadding = { 18, 16 },
+    FramePadding = { 8, 7 },
+    ItemSpacing = { 9, 7 },
+    ItemInnerSpacing = { 8, 6 },
+    ButtonHeight = 34,
+    TitleBarHeight = 40,
+    FrameHeight = 32,
+    ScrollbarSize = 10,
+    SliderHeight = 8,
+    BorderSize = 1,
+    FontSize = 15,
+    TitleFontSize = 15,
+
+    ColText = col(240, 240, 244),
+    ColTextDisabled = col(128, 132, 148),
+    ColWindowBg = col(18, 20, 32, 255),
+    ColFrameBg = col(30, 33, 50),
+    ColFrameBgHovered = col(42, 46, 68),
+    ColFrameBgActive = col(54, 59, 88),
+    ColTitleBg = col(24, 27, 42),
+    ColTitleBgActive = col(38, 51, 100),
+    ColButton = col(34, 37, 56),
+    ColButtonHovered = col(52, 57, 87),
+    ColButtonActive = col(70, 76, 116),
+    ColCheckMark = col(80, 160, 255),
+    ColHeader = col(32, 35, 53),
+    ColHeaderHovered = col(50, 55, 84),
+    ColHeaderActive = col(68, 74, 112),
+    ColSeparator = col(52, 56, 78),
+    ColScrollbarBg = col(16, 18, 27),
+    ColScrollbarGrab = col(70, 76, 108),
+    ColScrollbarGrabHovered = col(90, 97, 138),
+    ColScrollbarGrabActive = col(116, 124, 176),
+    ColBorder = col(52, 56, 80),
+    ColTextEdit = col(232, 232, 236),
+    ColPopupBg = col(22, 24, 38, 255),
+    ColSliderBg = col(24, 26, 40),
+    ColSliderGrab = col(70, 76, 110),
+    ColSliderGrabActive = col(96, 104, 150),
+    ColProgressBg = col(28, 31, 46),
+    ColProgressFill = col(76, 140, 255),
+    ColSelection = col(56, 86, 170),
+    ColTab = col(34, 37, 56),
+    ColTabHovered = col(50, 55, 84),
+    ColTabActive = col(70, 76, 116),
+    ColTooltipBg = col(10, 12, 22, 250),
+}
+
+local styleColorStack = {}
+local function styleColor(key)
+    return styleColorStack[key] or style[key]
+end
+function ImGui.PushStyleColor(key, c)
+    styleColorStack[key] = c
+end
+function ImGui.PopStyleColor(key)
+    styleColorStack[key] = nil
+end
+
+local fontStack = {}
+local fontCache = {}
+
+function ImGui.GetFont(name, size, bold)
+    local size = size or style.FontSize
+    local key = name .. '|' .. size .. '|' .. (bold and 'b' or 'r')
+    if isElement(fontCache[key]) then return fontCache[key] end
+
+    local resName = 'imcore'
+    if not getResourceFromName('imcore') then resName = 'core' end
+
+    local candidates = { name, 'Roboto-Medium', 'DroidSans', 'Cousine-Regular' }
+    for i = 1, #candidates do
+        local fname = candidates[i]
+        local prefixed = string.format(':%s/assets/fonts/%s.ttf', resName, fname)
+        local path = string.format('assets/fonts/%s.ttf', fname)
+        local src = fileExists(prefixed) and prefixed or (fileExists(path) and path or false)
+        if src then
+            local font = dxCreateFont(src, math.floor(max(size * pxn(1), 8)), bold)
+            if isElement(font) then
+                fontCache[key] = font
+            end
+            return font
+        end
+    end
+    return nil
+end
+
+local function safeFont(font)
+    if isElement(font) then return font end
+    return nil
+end
+
+function ImGui.PushFont(name, size, bold)
+    table.insert(fontStack, { font = ImGui.GetFont(name, size, bold), name = name, size = size, bold = bold })
+end
+function ImGui.PopFont()
+    if #fontStack > 0 then table.remove(fontStack) end
+end
+local function curFont()
+    local f = fontStack[#fontStack]
+    if f then return f.font, f.name, f.size end
+    local ws = 1
+    if g and g.activeWin and g.activeWin.fontScale and g.activeWin.fontScale > 0 then
+        ws = g.activeWin.fontScale
+    end
+    local size = style.FontSize * ws
+    return ImGui.GetFont('gotham', size, false), 'gotham', size
+end
+
+---------------------------------------------------------------------------- id system
+local idStack = {}
+local function calcHash(s)
+    local h = 5381
+    for i = 1, #s do
+        h = bitXor(h * 33, string.byte(s, i))
+    end
+    if h < 0 then h = -h end
+    return h % 2147483647
+end
+local function getId(label)
+    local h = 0
+    for _, v in ipairs(idStack) do
+        h = bitXor(h * 33, calcHash(v))
+    end
+    return bitXor(h * 33, calcHash(label)) % 2147483647
+end
+function ImGui.PushID(...)
+    local n = select('#', ...)
+    for i = 1, n do table.insert(idStack, tostring(select(i, ...))) end
+end
+function ImGui.PopID(n)
+    n = n or 1
+    for i = 1, n do
+        if #idStack > 0 then table.remove(idStack) end
+    end
+end
+
+---------------------------------------------------------------------------- per-window data
+local g = {
+    hoveredId = 0,
+    activeId = 0,
+    focusId = 0,
+}
+local windows = {}
+local windowOrder = {}
+local nextW, nextH = nil, nil
+local nextX, nextY = nil, nil
+
+local function isMouseInRect(x, y, w, h)
+    return isMouseInPosition(px(x), py(y), px(w), px(h))
+end
+
+local function isWindowFront(win)
+    local last = windowOrder[#windowOrder]
+    return last == win
+end
+
+local function bringToFront(win)
+    for i, w in ipairs(windowOrder) do
+        if w == win then
+            table.remove(windowOrder, i)
+            break
+        end
+    end
+    table.insert(windowOrder, win)
+end
+
+---------------------------------------------------------------------------- draw list
+local DList = {}
+local curRTWin = false
+
+local function drawListOf(win)
+    local i = #DList
+    if DList[i] == win then return win[1] end
+    local list = {}
+    win[1] = list
+    table.insert(DList, win)
+    return list
+end
+
+local popupList = {}
+
+local function drawCmdRec(c, win)
+    local x, y, w, h = c.x, c.y, c.w, c.h
+
+    if curRTWin then
+        local tb = style.TitleBarHeight
+        local xr = x + (w or 0)
+        local yb = y + (h or 0)
+        if yb < win.y + tb or y > win.y + win.h or xr < win.x or x > win.x + win.w then return end
+
+        local rx, ry = math.floor(pxn(x - win.x)), math.floor(pyn(y - win.y))
+        local rw, rh = math.floor(pxn(w)), math.floor(pyn(h))
+
+        if c.type == 'rect' then
+            dxDrawRectangle(rx, ry, rw, rh, toColor(unpack(c.c)))
+        elseif c.type == 'text' then
+            dxDrawText(c.text, rx, ry, rx, ry, toColor(unpack(c.c)), 1.0, 1.0, safeFont(c.font or curFont()))
+        elseif c.type == 'line' then
+            dxDrawLine(pxn(c.x1 - win.x), pyn(c.y1 - win.y), pxn(c.x2 - win.x), pyn(c.y2 - win.y), toColor(unpack(c.c)), pxn(c.thickness or 1))
+        elseif c.type == 'border' then
+            local t = pxn(c.thickness or 1)
+            dxDrawRectangle(rx, ry, rw, t, toColor(unpack(c.c)))
+            dxDrawRectangle(rx, ry + rh - t, rw, t, toColor(unpack(c.c)))
+            dxDrawRectangle(rx, ry, t, rh, toColor(unpack(c.c)))
+            dxDrawRectangle(rx + rw - t, ry, t, rh, toColor(unpack(c.c)))
+        elseif c.type == 'image' then
+            dxDrawImage(rx, ry, rw, rh, c.texture, 0, 0, 0, toColor(unpack(c.c)))
+        end
+    else
+        if c.type == 'rect' then
+            dxDrawRectangle(px(x), py(y), px(w), px(h), toColor(unpack(c.c)))
+        elseif c.type == 'text' then
+            dxDrawText(c.text, px(x), py(y), px(x), py(y), toColor(unpack(c.c)), 1.0, 1.0, safeFont(c.font or curFont()))
+        elseif c.type == 'line' then
+            dxDrawLine(px(c.x1), py(c.y1), px(c.x2), py(c.y2), toColor(unpack(c.c)), px(c.thickness or 1))
+        elseif c.type == 'border' then
+            local t = c.thickness or 1
+            dxDrawRectangle(px(x), py(y), px(w - t), px(t), toColor(unpack(c.c)))
+            dxDrawRectangle(px(x), py(y + h - t), px(w - t), px(t), toColor(unpack(c.c)))
+            dxDrawRectangle(px(x), py(y), px(t), px(h), toColor(unpack(c.c)))
+            dxDrawRectangle(px(x + w - t), py(y), px(t), px(h), toColor(unpack(c.c)))
+        elseif c.type == 'image' then
+            dxDrawImage(px(x), py(y), px(w), px(h), c.texture, 0, 0, 0, toColor(unpack(c.c)))
+        end
+    end
+end
+
+local function textWidth(text, font)
+    if text == nil then return 0 end
+    local f = safeFont(font or curFont())
+    if not f then return 0 end
+    local w = dxGetTextWidth(text, 1.0, f)
+    if type(w) ~= 'number' then w = 0 end
+    return w / pxn(1)
+end
+
+local function winRect(list, x, y, w, h, c)
+    table.insert(list, { type = 'rect', x = x, y = y, w = w, h = h, c = c })
+end
+local function winText(list, x, y, text, c, font, centerX, centerY)
+    if text == nil then return end
+    local f = safeFont(font or curFont())
+    if not f then return end
+    local tw = textWidth(text, f)
+    local th = (dxGetFontHeight(1.0, f) or style.FontSize) / (pxn(1) or 1)
+    local rx, ry = x, y
+    if centerX then rx = rx - tw / 2 end
+    if centerY then ry = ry - th / 2 end
+    table.insert(list, { type = 'text', x = rx, y = ry, text = text, c = c, font = f })
+end
+
+---------------------------------------------------------------------------- item behavior
+local function isWindowClickable(win)
+    if not win.visible then return false end
+    if win == curRTWin then return true end
+    return isWindowFront(win)
+end
+
+local function buttonBehavior(id, x, y, w, h, win)
+    local hovered = isWindowClickable(win) and isMouseInRect(x, y, w, h)
+    local active = g.activeId == id
+
+    if g.activeId == 0 and hovered and mouseClicked then
+        g.activeId = id
+        active = true
+        g.focusId = id
+    end
+
+    local clicked = false
+    if active and mouseReleased then
+        if hovered then clicked = true end
+        g.activeId = 0
+    end
+
+    return clicked, active, hovered
+end
+
+local function buttonBehaviorHold(id, x, y, w, h, win)
+    local hovered = isWindowClickable(win) and isMouseInRect(x, y, w, h)
+    local active = g.activeId == id
+
+    if g.activeId == 0 and hovered and mouseClicked then
+        g.activeId = id
+        g.focusId = id
+        active = true
+    end
+
+    return active, hovered
+end
+
+---------------------------------------------------------------------------- window flow helpers
+local function wBeginItem(win, w, h)
+    local list = drawListOf(win)
+    local x, y = win.cursorX, win.cursorY
+    win.cursorY = win.cursorY + h
+    if win.cursorY > win.contentMaxY then win.contentMaxY = win.cursorY end
+    return list, x, y
+end
+
+local function ensuredRT(win)
+    local sw, sh = px(win.w), py(win.h)
+    if not win.rt or not isElement(win.rt) then
+        win.rt = dxCreateRenderTarget(sw, sh, true)
+    else
+        local mw, mh = dxGetMaterialSize(win.rt)
+        if mw ~= sw or mh ~= sh then
+            destroyElement(win.rt)
+            win.rt = dxCreateRenderTarget(sw, sh, true)
+        end
+    end
+    return win.rt
+end
+
+---------------------------------------------------------------------------- NewFrame
+function ImGui.NewFrame()
+    updateMouse()
+    DList = {}
+    popupList = {}
+    for _, win in pairs(windows) do
+        win.visible = false
+        win.draw = false
+    end
+end
+
+---------------------------------------------------------------------------- windows
+function ImGui.Begin(name, open)
+    local id = getId(name)
+    local win = windows[id]
+    if not win then
+        local cascade = #windowOrder + 1
+        win = {
+            id = id,
+            name = name,
+            x = math.floor(uiW / 2 - 400 + ((cascade - 1) * 36) % 220),
+            y = math.floor(uiH / 2 - 300 + ((cascade - 1) * 28) % 180),
+            w = 800,
+            h = 600,
+            scrollY = 0,
+            scrollMax = 0,
+            collapsed = false,
+            bodyDrag = false,
+        }
+        windows[id] = win
+        table.insert(windowOrder, win)
+    end
+
+    win.visible = true
+    win.draw = true
+
+    if nextW and nextW > 0 then
+        win.w = nextW
+        win.h = nextH
+        nextW, nextH = nil, nil
+    end
+
+    if nextX and nextY then
+        win.x = nextX
+        win.y = nextY
+        nextX, nextY = nil, nil
+    end
+
+    local front = isWindowFront(win)
+    local tb = style.TitleBarHeight
+
+    if win.collapsed then
+        if mouseClicked and isMouseInRect(win.x, win.y, win.w, tb) then
+            win.collapsed = false
+            bringToFront(win)
+        end
+    end
+
+    if not win.collapsed then
+        local inTitle = isMouseInRect(win.x, win.y, win.w, tb)
+        local cw2 = 20
+        local inClose = isMouseInRect(win.x + win.w - (cw2 * 2 + 4), win.y + (tb - cw2) / 2, cw2 * 2 + 4, cw2)
+        local inResize = isMouseInRect(win.x + win.w - 16, win.y + win.h - 16, 16, 16)
+        local dragId = 'wdr_' .. id
+        local resId = 'wre_' .. id
+
+        if g.activeId == dragId then
+            if mouseDown then
+                win.x = math.floor(mouseX - win.dragOffX)
+                win.y = math.floor(mouseY - win.dragOffY)
+            else
+                g.activeId = 0
+            end
+        elseif g.activeId == resId then
+            if mouseDown then
+                win.w = math.floor(max(win.w + (mouseX - (win.x + win.w)), 220))
+                win.h = math.floor(max(win.h + (mouseY - (win.y + win.h)), 150))
+            else
+                g.activeId = 0
+            end
+        elseif g.activeId == 0 and mouseClicked then
+            if front and inTitle and not inClose and not win.bodyDrag then
+                g.activeId = dragId
+                win.dragOffX = mouseX - win.x
+                win.dragOffY = mouseY - win.y
+                bringToFront(win)
+                g.focusId = dragId
+            elseif front and inResize then
+                g.activeId = resId
+                bringToFront(win)
+                g.focusId = resId
+            elseif inTitle and not inClose and not front then
+                bringToFront(win)
+                win.bodyDrag = true
+            elseif inResize and not front then
+                bringToFront(win)
+                win.bodyDrag = true
+            end
+        end
+        win.bodyDrag = false
+
+        if front and wheel ~= 0 and isMouseInRect(win.x, win.y, win.w, win.h) then
+            win.scrollY = math.floor(win.scrollY - wheel * 70)
+        end
+    end
+
+    if not win.collapsed then
+        local wpad = style.WindowPadding
+        local hasSB = win.scrollMax > 1
+        win.sbW = hasSB and style.ScrollbarSize or 0
+        win.contentX = win.x + wpad[1]
+        win.contentY = win.y + tb + wpad[2]
+        win.contentW = win.w - wpad[1] * 2 - win.sbW
+        win.contentH = win.h - tb - wpad[2] * 2
+        win.cursorX = win.contentX
+        win.cursorY = win.contentY - win.scrollY
+        win.contentMaxX = win.contentX
+        win.contentMaxY = win.cursorY
+        win.contentRegionW = win.contentW
+        win.contentRegionH = win.contentH
+
+        if hasSB then
+            local sbxy = win.x + win.w - win.sbW - 1
+            local trackH = win.contentH
+            local thumbH = max(trackH * (trackH / (win.contentMaxY - win.contentY + trackH)), 24)
+            thumbH = min(thumbH, trackH)
+            local spaceY = trackH - thumbH
+            local thumbY = win.contentY + (win.scrollMax > 0 and (win.scrollY / win.scrollMax) * spaceY or 0)
+            local sbId = 'wsb_' .. id
+
+            local active, hovered = buttonBehaviorHold(sbId, sbxy, thumbY, win.sbW, thumbH, win)
+            if active then
+                win.sbOffset = win.sbOffset or 0
+                if mouseClicked then win.sbOffset = mouseY - thumbY end
+                local ny = mouseY - win.sbOffset - win.contentY
+                local frac = clamp(spaceY > 0 and ny / spaceY or 0, 0, 1)
+                win.scrollY = frac * win.scrollMax
+            elseif mouseClicked and isWindowClickable(win) and isMouseInRect(sbxy, win.contentY, win.sbW, trackH) then
+                win.scrollY = clamp((spaceY > 0 and (mouseY - win.contentY - thumbH / 2) / spaceY or 0), 0, 1) * win.scrollMax
+            end
+        end
+    end
+
+    g.activeWin = win
+
+    if win.collapsed then
+        return false
+    end
+
+    return true
+end
+
+function ImGui.EndWindow()
+    local win = g.activeWin
+    if not win then return end
+
+    local contentBottom = win.contentY + win.contentH
+    local newScrollMax = win.contentMaxY - contentBottom
+    if newScrollMax < 0 then newScrollMax = 0 end
+    win.scrollMax = newScrollMax
+    win.scrollY = clamp(win.scrollY, 0, win.scrollMax)
+end
+ImGui.End = ImGui.EndWindow
+
+---------------------------------------------------------------------------- layout
+function ImGui.SameLine(offset)
+    local win = g.activeWin
+    if not win then return end
+    win.cursorX = win.cursorX + (offset or 0)
+end
+
+function ImGui.Spacing()
+    local win = g.activeWin
+    if not win then return end
+    win.cursorY = win.cursorY + style.ItemSpacing[2]
+    if win.cursorY > win.contentMaxY then win.contentMaxY = win.cursorY end
+end
+
+function ImGui.Dummy(w, h)
+    local win = g.activeWin
+    if not win then return end
+    win.cursorY = win.cursorY + h
+    if win.cursorY > win.contentMaxY then win.contentMaxY = win.cursorY end
+    win.cursorX = win.cursorX + w
+end
+
+function ImGui.GetContentRegionAvail()
+    local win = g.activeWin
+    if not win then return 0, 0 end
+    return win.contentRegionW, win.contentRegionH
+end
+
+local itemWidth = 0
+function ImGui.PushItemWidth(w)
+    itemWidth = w
+end
+function ImGui.PopItemWidth()
+    itemWidth = 0
+end
+
+---------------------------------------------------------------------------- text
+function ImGui.Text(...)
+    local args = { ... }
+    local text = #args == 1 and tostring(args[1]) or string.format(unpack(args))
+    local win = g.activeWin
+    if not win then return end
+    local list, x, y = wBeginItem(win, 0, style.FontSize)
+    local font = curFont()
+    winText(list, x, y, text, styleColor('ColText'), font)
+    win.cursorX = win.contentX + textWidth(text, font)
+end
+
+function ImGui.TextColored(c, ...)
+    local args = { ... }
+    local text = #args == 1 and tostring(args[1]) or string.format(unpack(args))
+    local win = g.activeWin
+    if not win then return end
+    local list, x, y = wBeginItem(win, 0, style.FontSize)
+    winText(list, x, y, text, c, curFont())
+end
+
+function ImGui.Separator()
+    local win = g.activeWin
+    if not win then return end
+    win.cursorY = win.cursorY + style.ItemSpacing[2]
+    local list = drawListOf(win)
+    local x, y = win.cursorX, win.cursorY
+    winRect(list, x, y, win.contentW, 1, styleColor('ColSeparator'))
+    win.cursorY = win.cursorY + style.ItemSpacing[2]
+    if win.cursorY > win.contentMaxY then win.contentMaxY = win.cursorY end
+end
+
+---------------------------------------------------------------------------- button
+function ImGui.Button(label, size)
+    local win = g.activeWin
+    if not win then return false end
+
+    local w = size and size[1] or max(textWidth(label) + 28, 120)
+    local h = size and size[2] or style.ButtonHeight
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+
+    local id = getId(label .. '_btn')
+    local clicked, active, hovered = buttonBehavior(id, x, y, w, h, win)
+
+    local c
+    if active then c = styleColor('ColButtonActive')
+    elseif hovered then c = styleColor('ColButtonHovered')
+    else c = styleColor('ColButton') end
+
+    winRect(list, x, y, w, h, c)
+    winText(list, x + w / 2, y + h / 2, label, styleColor('ColText'), nil, true, true)
+    return clicked
+end
+
+function ImGui.SmallButton(label)
+    return ImGui.Button(label, { 110, 28 })
+end
+
+---------------------------------------------------------------------------- checkbox
+function ImGui.Checkbox(label, state)
+    local win = g.activeWin
+    if not win then return false, state end
+
+    local size = 26
+    local height = 30
+    local w = textWidth(label) + size + style.ItemInnerSpacing[2]
+    local list, x, y = wBeginItem(win, w, height + style.ItemSpacing[2])
+
+    local id = getId(label .. '_chk')
+    local clicked, active, hovered = buttonBehavior(id, x, y, size, size, win)
+
+    local bgc
+    if active then bgc = styleColor('ColFrameBgActive')
+    elseif hovered then bgc = styleColor('ColFrameBgHovered')
+    else bgc = styleColor('ColFrameBg') end
+
+    winRect(list, x, y, size, size, bgc)
+    if state then
+        local m = 5
+        winRect(list, x + m, y + m, size - m * 2, size - m * 2, styleColor('ColCheckMark'))
+    end
+    winText(list, x + size + style.ItemInnerSpacing[2], y + height / 2 - style.FontSize / 2, label, styleColor('ColText'))
+
+    if clicked then state = not state end
+    return clicked, state
+end
+
+---------------------------------------------------------------------------- radio
+function ImGui.RadioButton(label, current, value)
+    local clicked, state = ImGui.Checkbox(label, current == value)
+    if clicked then current = value end
+    return clicked, current
+end
+
+---------------------------------------------------------------------------- slider
+function ImGui.SliderFloat(label, v, vmin, vmax)
+    local win = g.activeWin
+    if not win then return false, v end
+
+    local w = itemWidth > 0 and itemWidth or 260
+    local h = style.FrameHeight
+    local fw = textWidth(label) + 22
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+
+    local rx, rw = x + fw, w - fw
+    local id = getId(label .. '_sli')
+
+    local active, hovered = buttonBehaviorHold(id, rx, y, rw, h, win)
+
+    local frac = clamp((v - vmin) / (vmax - vmin), 0, 1)
+    local changed = false
+
+    if active then
+        frac = clamp((mouseX - rx) / rw, 0, 1)
+        v = vmin + (vmax - vmin) * frac
+        changed = true
+        if mouseReleased then g.activeId = 0 end
+    end
+
+    winText(list, x, y, label, styleColor('ColText'))
+    winRect(list, rx, y + h / 2 - style.SliderHeight / 2, rw, style.SliderHeight, styleColor('ColSliderBg'))
+    winRect(list, rx, y + h / 2 - style.SliderHeight / 2, rw * frac, style.SliderHeight,
+        active and styleColor('ColSliderGrabActive') or styleColor('ColSliderGrab'))
+
+    local tw = textWidth(string.format('%.2f', v))
+    winText(list, rx + rw - tw, y, string.format('%.2f', v), styleColor('ColText'))
+
+    return changed, v
+end
+
+function ImGui.SliderInt(label, v, vmin, vmax)
+    local changed, nv = ImGui.SliderFloat(label, v, vmin, vmax)
+    return changed, math.floor(nv + 0.5)
+end
+
+function ImGui.DragFloat(label, v, vmin, vmax)
+    return ImGui.SliderFloat(label, v, vmin, vmax)
+end
+
+---------------------------------------------------------------------------- input text
+function ImGui.InputText(label, text, maxlen)
+    local win = g.activeWin
+    if not win then return false, text end
+
+    local w = itemWidth > 0 and itemWidth or 260
+    local h = style.FrameHeight
+    local fw = textWidth(label) + 22
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+
+    local rx, rw = x + fw, w - fw
+    local id = getId(label .. '_inp')
+
+    local clicked, active, hovered = buttonBehavior(id, rx, y, rw, h, win)
+    local isActive = g.focusId == id
+
+    local c
+    if isActive then c = styleColor('ColFrameBgActive')
+    elseif hovered then c = styleColor('ColFrameBgHovered')
+    else c = styleColor('ColFrameBg') end
+
+    winRect(list, rx, y, rw, h, c)
+    winText(list, x, y, label, styleColor('ColText'))
+    winText(list, rx + 6, y, tostring(text), styleColor('ColTextEdit'))
+
+    if isActive then
+        local newText = tostring(text)
+
+        if #charQueue > 0 then
+            for _, ch in ipairs(charQueue) do
+                if not maxlen or utf8.len(newText) < maxlen then
+                    newText = newText .. ch
+                end
+            end
+            for i = 1, #charQueue do table.remove(charQueue, 1) end
+        end
+
+        if #keyQueue > 0 then
+            for _, key in ipairs(keyQueue) do
+                if key == 'backspace' then
+                    newText = utf8.sub(newText, 1, utf8.len(newText) - 1)
+                elseif key == 'enter' or key == 'escape' then
+                    g.focusId = 0
+                    g.activeId = 0
+                end
+            end
+            for i = 1, #keyQueue do table.remove(keyQueue, 1) end
+        end
+
+        if newText ~= text then
+            text = newText
+        end
+
+        local bw = textWidth(tostring(text))
+        local blk = (getTickCount() % 1000) < 500
+        if blk then winRect(list, rx + 6 + bw, y + 4, 2, h - 8, styleColor('ColText')) end
+    end
+
+    return isActive, text
+end
+
+function ImGui.InputTextMultiline(label, text, w, h)
+    return ImGui.InputText(label, text)
+end
+
+---------------------------------------------------------------------------- combo
+local function comboPopup(id, items, selected, x, y, w)
+    local hh = style.FrameHeight
+    local result = false
+    local totalH = #items * hh
+
+    dxDrawRectangle(px(x - 3), py(y + 3), px(w + 6), px(totalH + 6), toColor(unpack(styleColor('ColPopupBg'))))
+
+    for i, item in ipairs(items) do
+        local iy = y + (i - 1) * hh
+        local hovered = isMouseInRect(x, iy, w, hh)
+        local itemId = getId('c_' .. id .. '_' .. i)
+        local act = g.activeId == itemId
+
+        if g.activeId == 0 and hovered and mouseClicked then
+            g.activeId = itemId
+            g.focusId = itemId
+        end
+
+        local bgc = itemId == selected and styleColor('ColSelection') or (hovered and styleColor('ColFrameBgHovered') or styleColor('ColPopupBg'))
+        dxDrawRectangle(px(x), py(iy), px(w), px(hh), toColor(unpack(bgc)))
+        dxDrawText(item, px(x + 6), py(iy), px(x + 6), py(iy), toColor(unpack(styleColor('ColText'))), 1.0, 1.0, curFont())
+
+        if act and mouseReleased then
+            g.activeId = 0
+            g.focusId = 0
+            result = i
+        end
+    end
+
+    if mouseClicked and not isMouseInRect(x, y - 6, w, totalH + 12) then
+        g.activeId = 0
+        g.focusId = 0
+    end
+
+    return result
+end
+
+function ImGui.Combo(label, current, items)
+    local win = g.activeWin
+    if not win then return false, current end
+
+    local w = itemWidth > 0 and itemWidth or 260
+    local h = style.FrameHeight
+    local fw = textWidth(label) + 22
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+
+    local rx, rw = x + fw, w - fw
+    local id = getId(label .. '_cob')
+    local openId = 'combo_open_' .. id
+
+    local clicked, active, hovered = buttonBehavior(id, rx, y, rw, h, win)
+
+    local c
+    if active then c = styleColor('ColButtonActive')
+    elseif hovered then c = styleColor('ColButtonHovered')
+    else c = styleColor('ColButton') end
+
+    winRect(list, rx, y, rw, h, c)
+    winText(list, rx + 6, y, tostring(items[current] or items[1] or ''), styleColor('ColText'))
+    winText(list, rx + rw - 22, y, 'v' .. ' ', styleColor('ColTextDisabled'))
+
+    local isOpen = g.activeId == openId
+    if clicked then
+        g.activeId = openId
+        g.focusId = openId
+        isOpen = true
+    end
+
+    if isOpen then
+        local result = comboPopup(openId, items, current, rx, y + h)
+        if result then
+            current = result
+        end
+    end
+
+    return clicked, current
+end
+
+---------------------------------------------------------------------------- selectable / listbox
+function ImGui.Selectable(label, selected, height, width)
+    local win = g.activeWin
+    if not win then return false end
+
+    local h = height or 32
+    local w = width or win.contentW
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+
+    local id = getId(label .. '_sel')
+    local clicked, active, hovered = buttonBehavior(id, x, y, w, h, win)
+
+    if active or selected then
+        winRect(list, x, y, w, h, styleColor('ColSelection'))
+    elseif hovered then
+        winRect(list, x, y, w, h, styleColor('ColHeaderHovered'))
+    end
+
+    winText(list, x + 8, y, label, styleColor('ColText'))
+    return clicked
+end
+
+function ImGui.ListBox(label, current, items)
+    local win = g.activeWin
+    if not win then return false, current end
+
+    local w = itemWidth > 0 and itemWidth or 260
+    local h = style.FrameHeight * 5
+    local fw = textWidth(label) + 12
+    local list, x, y = wBeginItem(win, w + 8, h + style.ItemSpacing[2] + style.ItemSpacing[2])
+
+    winText(list, x, y + h + 8, label, styleColor('ColText'))
+    winRect(list, x, y, w, h, styleColor('ColFrameBg'))
+
+    for i, item in ipairs(items) do
+        local iy = y + (i - 1) * style.FrameHeight
+        local id = getId(label .. i .. '_lb')
+        local clicked, active, hovered = buttonBehavior(id, x, iy, w, style.FrameHeight, win)
+
+        if i == current then
+            winRect(list, x, iy, w, style.FrameHeight, styleColor('ColSelection'))
+        elseif hovered then
+            winRect(list, x, iy, w, style.FrameHeight, styleColor('ColHeaderHovered'))
+        end
+
+        winText(list, x + 6, iy, tostring(item), styleColor('ColText'))
+        if clicked then current = i end
+    end
+
+    return false, current
+end
+
+---------------------------------------------------------------------------- progress bar
+function ImGui.ProgressBar(frac, forceLabel)
+    local win = g.activeWin
+    if not win then return end
+
+    local w = itemWidth > 0 and itemWidth or 260
+    local h = 22
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+
+    winRect(list, x, y, w, h, styleColor('ColProgressBg'))
+    frac = clamp(frac, 0, 1)
+    winRect(list, x, y, w * frac, h, styleColor('ColProgressFill'))
+    local f9 = ImGui.GetFont('Roboto-Medium', 9, false)
+    winText(list, x + w / 2, y + h / 2, math.floor(frac * 100) .. '%', styleColor('ColText'), f9, true, true)
+
+    if forceLabel then
+        winText(list, x, y - 18, forceLabel, styleColor('ColTextDisabled'), f9)
+    end
+end
+
+---------------------------------------------------------------------------- collapsible
+function ImGui.CollapsingHeader(label, defaultOpen)
+    local win = g.activeWin
+    if not win then return false end
+
+    local h = 34
+    local list, x, y = wBeginItem(win, win.contentW, h + style.ItemSpacing[2])
+
+    local id = getId(label .. '_clh')
+    local clicked, active, hovered = buttonBehavior(id, x, y, win.contentW, h, win)
+
+    win.collapseState = win.collapseState or {}
+    local open = win.collapseState[id]
+    if open == nil then
+        open = defaultOpen or false
+        win.collapseState[id] = open
+    end
+
+    if hovered then winRect(list, x, y, win.contentW, h, styleColor('ColHeaderHovered')) end
+
+    winText(list, x + 12, y, (open and '[-] ' or '[+] ') .. label, styleColor('ColText'))
+
+    if clicked then
+        open = not open
+        win.collapseState[id] = open
+    end
+
+    return open
+end
+ImGui.TreeNode = ImGui.CollapsingHeader
+ImGui.TreeNodeEx = ImGui.CollapsingHeader
+
+---------------------------------------------------------------------------- tabs
+function ImGui.BeginTabBar(id)
+    return true
+end
+function ImGui.EndTabBar()
+end
+
+function ImGui.TabItem(label, selected)
+    local win = g.activeWin
+    if not win then return false end
+
+    local h = 34
+    local w = textWidth(label) + 32
+    local list, x, y = wBeginItem(win, w, h + 2)
+
+    local id = getId(label .. '_tab')
+    local clicked, active, hovered = buttonBehavior(id, x, y, w, h, win)
+
+    local c
+    if active or selected then
+        c = styleColor('ColTabActive')
+    elseif hovered then
+        c = styleColor('ColTabHovered')
+    else
+        c = styleColor('ColTab')
+    end
+
+    winRect(list, x, y, w, h, c)
+    winText(list, x + w / 2, y, label, styleColor('ColText'))
+
+    if clicked then selected = true end
+    return selected
+end
+
+---------------------------------------------------------------------------- tables
+function ImGui.BeginTable(id, columnCount, rowHeight)
+    local win = g.activeWin
+    if not win then return false end
+
+    win.tbl = {
+        cols = columnCount or 2,
+        rowH = rowHeight or 30,
+        baseX = win.cursorX,
+        baseY = win.cursorY,
+        col = 0,
+        row = 0,
+    }
+    win.cursorX = win.tbl.baseX
+    return true
+end
+
+function ImGui.TableNextRow()
+    local win = g.activeWin
+    if not win or not win.tbl then return false end
+    win.tbl.row = win.tbl.row + 1
+    win.tbl.col = 0
+    win.cursorX = win.tbl.baseX
+    win.cursorY = win.tbl.baseY + (win.tbl.row - 1) * win.tbl.rowH
+    return true
+end
+
+function ImGui.TableSetColumnIndex(col)
+    local win = g.activeWin
+    if not win or not win.tbl then return false end
+    local cw = win.contentW / win.tbl.cols
+    win.tbl.col = col or win.tbl.col + 1
+    win.tbl.col = clamp(win.tbl.col, 1, win.tbl.cols)
+    win.cursorX = win.tbl.baseX + (win.tbl.col - 1) * cw
+    return true
+end
+
+function ImGui.GetColumnWidth()
+    local win = g.activeWin
+    if not win then return 0 end
+    if win.tbl then return win.contentW / win.tbl.cols end
+    return win.contentW
+end
+
+function ImGui.ShowDemoWindow(name, show)
+    if not show then return true end
+
+    local closed = false
+    if ImGui.Begin(name or 'Dear ImGui Demo') then
+        ImGui.Text('Immediate-mode demo (порт Dear ImGui -> Lua)')
+
+        ImGui.Spacing()
+        local c1, v1 = ImGui.Checkbox('Демо чекбокс', true)
+        local c2, v2 = ImGui.RadioButton('Радио 1', 1, 1)
+        local c3, v3 = ImGui.RadioButton('Радио 2', 1, 2)
+
+        ImGui.Spacing()
+        local s1, sv = ImGui.SliderFloat('Яркость', 0.5, 0, 1)
+        local s2, sv2 = ImGui.SliderInt('Объём', 80, 0, 100)
+
+        ImGui.Spacing()
+        ImGui.ProgressBar(0.68)
+
+        ImGui.Spacing()
+        ImGui.BeginTable('demo_tbl', 2, 30)
+        ImGui.TableNextRow(); ImGui.TableSetColumnIndex(1); ImGui.Text('Имя')
+        ImGui.TableSetColumnIndex(2); ImGui.Text('Значение')
+        ImGui.TableNextRow(); ImGui.TableSetColumnIndex(1); ImGui.Text('CPU')
+        ImGui.TableSetColumnIndex(2); ImGui.Text('63%')
+        ImGui.TableNextRow(); ImGui.TableSetColumnIndex(1); ImGui.Text('RAM')
+        ImGui.TableSetColumnIndex(2); ImGui.Text('2.1G')
+        ImGui.EndTable()
+
+        ImGui.Spacing()
+        if ImGui.CollapsingHeader('Справка', true) then
+            ImGui.Text('Это окно управляется ImGui.ShowDemoWindow().')
+        end
+
+        if ImGui.Button('Закрыть демо') then
+            closed = true
+        end
+    end
+    ImGui.End()
+
+    if closed then
+        ImGui.CloseWindow(name or 'Dear ImGui Demo')
+    end
+    return not closed
+end
+
+function ImGui.CloseWindow(name)
+    local win = windows[getId(name)]
+    if win then win.visible = false end
+end
+
+function ImGui.EndTable()
+    local win = g.activeWin
+    if not win or not win.tbl then return end
+    local cw = win.contentW / win.tbl.cols
+    win.cursorY = win.tbl.baseY + win.tbl.row * win.tbl.rowH
+    win.cursorX = win.tbl.baseX + cw * win.tbl.cols
+    if win.cursorY > win.contentMaxY then win.contentMaxY = win.cursorY end
+    win.tbl = nil
+end
+
+---------------------------------------------------------------------------- image
+function ImGui.Image(texture, w, h, tint)
+    local win = g.activeWin
+    if not win then return false end
+
+    local list, x, y = wBeginItem(win, w, h + style.ItemSpacing[2])
+    local id = getId('img_' .. tostring(texture))
+    local clicked = buttonBehavior(id, x, y, w, h, win)
+    table.insert(list, { type = 'image', x = x, y = y, w = w, h = h, texture = texture, c = tint or { 255, 255, 255, 255 } })
+    return clicked
+end
+
+---------------------------------------------------------------------------- tooltip
+local tooltipText = false
+function ImGui.SetTooltip(text)
+    tooltipText = text
+end
+
+---------------------------------------------------------------------------- Render
+local function renderTitlebar(win)
+    local tb = style.TitleBarHeight
+    local colTitle = styleColor('ColTitleBgActive')
+    local titleFont = ImGui.GetFont('Roboto-Medium', style.TitleFontSize * (win.fontScale or 1), true)
+
+    dxDrawRectangle(px(win.x), py(win.y), px(win.w), py(tb), toColor(unpack(colTitle)))
+
+    local titleFontEl = safeFont(titleFont)
+    local fh = (titleFontEl and dxGetFontHeight(1.0, titleFontEl)) or 14
+    local ty = win.y + (tb - fh) / 2
+
+    dxDrawRectangle(px(win.x + 12), py(ty + (fh - 9) / 2), pxn(9), pyn(9), toColor(unpack(styleColor('ColTextDisabled'))))
+    dxDrawText(win.name, px(win.x + 28), py(ty), px(win.x + 28), py(ty),
+        toColor(unpack(styleColor('ColText'))), 1.0, 1.0, safeFont(titleFont))
+
+    if win.collapsed then return end
+
+    local cw = 20
+    local cy0 = win.y + (tb - cw) / 2
+    local xBlk = win.x + win.w - (cw * 2 + 4)
+
+    local function titleBtn(bx, bgCol, symbol, onClick, hov)
+        if hov then
+            dxDrawRectangle(px(bx), py(cy0), px(cw), py(cw), toColor(unpack(bgCol)))
+        end
+        dxDrawText(symbol, px(bx + (cw - textWidth(symbol, titleFont)) / 2), py(cy0 + (cw - fh) / 2), px(bx), py(cy0),
+            toColor(unpack(styleColor('ColText'))), 1.0, 1.0, safeFont(titleFont))
+        if hov and mouseClicked then onClick() end
+    end
+
+    local hovM = isMouseInRect(xBlk, cy0, cw, cw)
+    local hovX = isMouseInRect(xBlk + cw + 4, cy0, cw, cw)
+    titleBtn(xBlk, styleColor('ColButtonHovered'), '-', function() win.collapsed = true end, hovM)
+    titleBtn(xBlk + cw + 4, { 180, 60, 60, 220 }, 'x', function() win.collapsed = true end, hovX)
+end
+
+function ImGui.Render()
+    for wi, win in ipairs(windowOrder) do
+        if win.visible and not win.collapsed then
+            if win.rt and not isElement(win.rt) then ensuredRT(win) end
+            ensuredRT(win)
+
+            local list = drawListOf(win)
+            dxSetRenderTarget(win.rt, true)
+            curRTWin = win
+            dxDrawRectangle(0, 0, px(win.w), py(win.h), toColor(unpack(styleColor('ColWindowBg'))))
+            for j = 1, #list do
+                drawCmdRec(list[j], win)
+            end
+            curRTWin = false
+            dxSetRenderTarget()
+
+            dxDrawImage(px(win.x), py(win.y), px(win.w), px(win.h), win.rt)
+            renderTitlebar(win)
+        elseif win.visible and win.collapsed then
+            renderTitlebar(win)
+        end
+    end
+
+    local borderC = styleColor('ColBorder')
+    for wi, win in ipairs(windowOrder) do
+        if win.visible and not win.collapsed then
+            local b = style.BorderSize
+            dxDrawRectangle(px(win.x), py(win.y), px(win.w), px(b), toColor(unpack(borderC)))
+            dxDrawRectangle(px(win.x), py(win.y + win.h - b), px(win.w), px(b), toColor(unpack(borderC)))
+            dxDrawRectangle(px(win.x), py(win.y), px(b), px(win.h), toColor(unpack(borderC)))
+            dxDrawRectangle(px(win.x + win.w - b), py(win.y), px(b), px(win.h), toColor(unpack(borderC)))
+        end
+    end
+
+    if tooltipText then
+        local tx, ty = mouseX, mouseY
+        local tw = textWidth(tooltipText) + 26
+        local th = style.FontSize + 18
+        if tx + tw > uiW then tx = tx - tw end
+        if ty + th > uiH then ty = ty - th end
+        dxDrawRectangle(px(tx), py(ty), px(tw), px(th), toColor(unpack(styleColor('ColTooltipBg'))))
+        dxDrawText(tooltipText, px(tx + 13), py(ty + th / 2 - style.FontSize / 2), px(tx + 13), py(ty + th / 2 - style.FontSize / 2),
+            toColor(unpack(styleColor('ColText'))), 1.0, 1.0, curFont())
+    end
+    tooltipText = false
+
+    local startChar = #charQueue
+    for i = 1, startChar do table.remove(charQueue, 1) end
+    local startKey = #keyQueue
+    for i = 1, startKey do table.remove(keyQueue, 1) end
+end
+
+function ImGui.SetNextWindowSize(w, h)
+    nextW, nextH = math.floor(w or 0), math.floor(h or 0)
+end
+
+function ImGui.SetNextWindowPos(x, y)
+    nextX, nextY = math.floor(x or 0), math.floor(y or 0)
+end
+
+function ImGui.SetWindowFontScale(scale)
+    local win = g.activeWin
+    if win then
+        win.fontScale = scale or 1
+    end
+end
+
+function ImGui.CenterWindow(name)
+    local win = windows[getId(name)]
+    if win then
+        win.x = (uiW - win.w) / 2
+        win.y = (uiH - win.h) / 2
+    end
+end
+
+function ImGui.EndFrame()
+end

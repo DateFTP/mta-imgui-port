@@ -1,0 +1,4 @@
+﻿<meta>
+	<info author="dateftp" name="imcore-example-multi" type="script" version="1.0" description="Multi-window demo: 5 ImGui windows at once (stress test)"/>
+	<script src="client.lua" type="client" cache="false"/>
+</meta>

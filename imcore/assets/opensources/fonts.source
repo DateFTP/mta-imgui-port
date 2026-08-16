@@ -1,0 +1,43 @@
+---------------------------------------------------------------------------
+-- Шрифтовые обёртки imcore (автономные, без gui.* зависимостей).
+local fonts = {}
+
+mta_dxGetTextWidth = dxGetTextWidth
+function dxGetTextWidth(text, scale, font, colored)
+    return mta_dxGetTextWidth(text, scale, getFontElement(font), colored)
+end
+
+mta_dxGetFontHeight = dxGetFontHeight
+function dxGetFontHeight(scale, font)
+    return mta_dxGetFontHeight(scale, getFontElement(font))
+end
+
+function clearFonts()
+    for index, font in pairs(fonts) do
+        if isElement(font) then
+            destroyElement(font)
+            fonts[index] = nil
+        end
+    end
+end
+
+function getFontElement(tbl)
+    if isElement(tbl) or type(tbl) == 'string' then
+        return tbl
+    end
+
+    local font, _scale, fontType = unpack(tbl or {})
+    if type(font) ~= 'string' then return false end
+
+    local scale = _scale or 1
+    local fontIndex = font .. '|' .. tostring(scale) .. '|' .. tostring(fontType)
+    if fonts[fontIndex] then
+        return fonts[fontIndex]
+    end
+
+    local el = dxCreateFont(font, math.max(math.floor(scale), 8), false)
+    if isElement(el) then
+        fonts[fontIndex] = el
+    end
+    return fonts[fontIndex]
+end

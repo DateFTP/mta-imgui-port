@@ -1,0 +1,71 @@
+﻿<meta>
+	<info author="dateftp" name="imcore" type="script" version="1.0" description="Immediate-mode GUI library for MTA: Dear ImGui port to Lua"/>
+	<script src="shared/include.lua" type="shared" cache="false"/>
+	<script src="shared/includes.lua" type="shared" cache="false"/>
+
+	<script src="server/server.lua" type="server"/>
+	<script src="server/create_includes.lua" type="server"/>
+	<script src="client/client.lua" type="client" cache="false"/>
+
+	<file src="assets/fonts/gotham.ttf"/>
+	<file src="assets/fonts/gotham_regular.ttf"/>
+	<file src="assets/fonts/gotham_medium.ttf"/>
+	<file src="assets/fonts/manrope_bold.ttf"/>
+	<file src="assets/fonts/gotham_black.ttf"/>
+	<file src="assets/fonts/gotham_bold.ttf"/>
+	<file src="assets/fonts/proximanova.ttf"/>
+	<file src="assets/fonts/proximanova_bold.ttf"/>
+	<file src="assets/fonts/proximanova_extrabold.ttf"/>
+	<file src="assets/fonts/proximanova_semibold_italic.ttf"/>
+	<file src="assets/fonts/proximanova_bold_italic.ttf"/>
+	<file src="assets/fonts/proximanova_semibold.ttf"/>
+	<file src="assets/fonts/proximanova_light.ttf"/>
+	<file src="assets/fonts/ttnorms_bold.ttf"/>
+	<file src="assets/fonts/ttnorms_medium.ttf"/>
+	<file src="assets/fonts/manrope_medium.ttf"/>
+	<file src="assets/fonts/manrope_semibold.ttf"/>
+	<file src="assets/fonts/myriad_pro.ttf"/>
+	<file src="assets/fonts/jellee_roman.ttf"/>
+	<file src="assets/fonts/armadura.ttf"/>
+
+	<file src="assets/fonts/montserrat.ttf"/>
+	<file src="assets/fonts/montserrat_black.ttf"/>
+	<file src="assets/fonts/montserrat_black_italic.ttf"/>
+	<file src="assets/fonts/montserrat_bold.ttf"/>
+	<file src="assets/fonts/montserrat_bold_italic.ttf"/>
+	<file src="assets/fonts/montserrat_extrabold.ttf"/>
+	<file src="assets/fonts/montserrat_extrabold_italic.ttf"/>
+	<file src="assets/fonts/montserrat_italic.ttf"/>
+	<file src="assets/fonts/montserrat_light.ttf"/>
+	<file src="assets/fonts/montserrat_light_italic.ttf"/>
+	<file src="assets/fonts/montserrat_medium.ttf"/>
+	<file src="assets/fonts/montserrat_medium_italic.ttf"/>
+	<file src="assets/fonts/montserrat_semibold.ttf"/>
+	<file src="assets/fonts/montserrat_semibold_italic.ttf"/>
+	<file src="assets/fonts/montserrat_thin.ttf"/>
+	<file src="assets/fonts/montserrat_thin_italic.ttf"/>
+
+	<file src="assets/fonts/hb.ttf"/>
+	<file src="assets/fonts/hb_bold.ttf"/>
+	<file src="assets/fonts/hb_bold_italic.ttf"/>
+	<file src="assets/fonts/hb_extrabold.ttf"/>
+	<file src="assets/fonts/hb_extrabold_italic.ttf"/>
+	<file src="assets/fonts/hb_italic.ttf"/>
+	<file src="assets/fonts/hb_medium.ttf"/>
+	<file src="assets/fonts/hb_medium_italic.ttf"/>
+
+	<file src="assets/fonts/Cousine-Regular.ttf"/>
+	<file src="assets/fonts/DroidSans.ttf"/>
+	<file src="assets/fonts/Karla-Regular.ttf"/>
+	<file src="assets/fonts/ProggyClean.ttf"/>
+	<file src="assets/fonts/ProggyTiny.ttf"/>
+	<file src="assets/fonts/Roboto-Medium.ttf"/>
+
+	<export function="getFonts" type="client"/>
+	<export function="getClientFont" type="client"/>
+	<export function="include" type="shared"/>
+
+	<download_priority_group>999999</download_priority_group>
+	<oop>true</oop>
+	<min_mta_version client="1.5.5" server="1.5.5"/>
+</meta>

@@ -1,0 +1,4 @@
+﻿<meta>
+	<info author="dateftp" name="imcore-example" type="script" version="1.0" description="ImGui port demo: multi-page menu (client, imcore library)"/>
+	<script src="client.lua" type="client" cache="false"/>
+</meta>

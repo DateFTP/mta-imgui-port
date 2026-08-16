@@ -1,0 +1,5 @@
+﻿<meta>
+	<info author="dateftp" name="imcore-example-auth" type="script" version="1.0" description="Auth demo: register/login via addAccount/logIn (client + server)"/>
+	<script src="client.lua" type="client" cache="false"/>
+	<script src="server.lua" type="server"/>
+</meta>

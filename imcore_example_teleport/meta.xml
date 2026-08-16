@@ -1,0 +1,6 @@
+﻿<meta>
+	<info author="dateftp" name="imcore-example-teleport" type="script" version="1.0" description="Teleport manager: server-side teleport with shared config (client + server)"/>
+	<script src="shared.lua" type="shared"/>
+	<script src="client.lua" type="client" cache="false"/>
+	<script src="server.lua" type="server"/>
+</meta>

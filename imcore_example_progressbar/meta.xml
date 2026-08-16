@@ -1,0 +1,4 @@
+﻿<meta>
+	<info author="dateftp" name="imcore-example-progressbar" type="script" version="1.0" description="Animated progress bars demo (client, imcore library)"/>
+	<script src="client.lua" type="client" cache="false"/>
+</meta>

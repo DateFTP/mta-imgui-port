@@ -1,0 +1,6 @@
+﻿<meta>
+	<info author="dateftp" name="imcore-example-money" type="script" version="1.0" description="Money demo: give money via server side (client + server, admin)"/>
+	<script src="client.lua" type="client" cache="false"/>
+	<script src="server.lua" type="server"/>
+	<oop>true</oop>
+</meta>
